@@ -16,7 +16,7 @@ if (window.top !== window.self) {
         const canvasContainer = document.getElementsByTagName("garlic-bread-embed")[0].shadowRoot.children[0].getElementsByTagName("garlic-bread-canvas")[0].shadowRoot.children[0];
         const overlayImage = document.createElement("img");
         overlayImage.src = url;
-        overlayImage.style = `position: absolute;left: 0;top: 0;image-rendering: pixelated;width: 100opx;height: 1000px;`;
+        overlayImage.style = `position: absolute;left: 0;top: 0;image-rendering: pixelated;width: 1000px;height: 1000px;`;
         canvasContainer.appendChild(overlayImage);
     }, false);
 }
