@@ -10,7 +10,7 @@
 // @downloadURL  https://github.com/PlaceDE-Official/place-overlay/raw/main/src/scripts/placeDE-overlay.user.js
 // ==/UserScript==
 
-let url = "https://www.nme.com/wp-content/uploads/2021/07/RickAstley2021.jpg"
+let url = "https://place.army/overlay_target.png"
 if (window.top !== window.self) {
     window.addEventListener('load', () => {
         document.getElementsByTagName("garlic-bread-embed")[0].shadowRoot.children[0].getElementsByTagName("garlic-bread-canvas")[0].shadowRoot.children[0].appendChild(
