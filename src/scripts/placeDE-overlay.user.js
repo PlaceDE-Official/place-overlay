@@ -10,17 +10,20 @@
 // @downloadURL  https://github.com/PlaceDE-Official/place-overlay/raw/main/src/scripts/placeDE-overlay.user.js
 // ==/UserScript==
 
-let overlayImage = null;
+var updateTimer = 30000,
+    src = "https://place.army/overlay_target.png",
+    style = "position: absolute;left: 0;top: 0;image-rendering: pixelated;width: 1000px;height: 1000px;";
+
 if(window.top !== window.self) {
-    window.addEventListener("load", function() {
+    window.addEventListener("load", () => {
         const canvasContainer = document.querySelector("garlic-bread-embed").shadowRoot.querySelector("garlic-bread-canvas").shadowRoot.querySelector(".container");
-        overlayImage = document.createElement("img");
+        const overlayImage = document.createElement("img");
         function updateImage() {
-            overlayImage.src = "https://place.army/overlay_target.png?" + Date.now()
+            overlayImage.src = src + "?" + Date.now()
         }
         updateImage();
-        setInterval(updateImage, 30000);
-        overlayImage.style = "position: absolute;left: 0;top: 0;image-rendering: pixelated;width: 1000px;height: 1000px;";
+        setInterval(updateImage, updateTimer);
+        overlayImage.style = style;
         canvasContainer.appendChild(overlayImage);
     }, false);
 }
