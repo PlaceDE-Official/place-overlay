@@ -25,4 +25,4 @@ function updateImage() {
     overlayImage.src = "https://place.army/overlay_target.png?" + Date.now()
 }
 
-setInterval(function () {overlayImage.src = "https://place.army/overlay_target.png?" + Date.now()}, 30000);
+setInterval(function () {updateImage()}, 30000);
