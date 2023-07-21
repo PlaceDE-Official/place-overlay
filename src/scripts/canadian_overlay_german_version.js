@@ -6,6 +6,8 @@
 // @author       max-was-here
 // @match        https://garlic-bread.reddit.com/embed*
 // @icon         https://www.redditstatic.com/desktop2x/img/favicon/favicon-32x32.png
+// @updateURL    https://github.com/PlaceDE-Official/place-overlay/raw/main/src/scripts/canadian_overlay_german_version.js
+// @downloadURL  https://github.com/PlaceDE-Official/place-overlay/raw/main/src/scripts/canadian_overlay_german_version.js
 // @grant        none
 // ==/UserScript==
 
