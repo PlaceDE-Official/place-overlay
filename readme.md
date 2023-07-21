@@ -39,10 +39,13 @@ Falls das Overlay nicht funktioniert stelle bitte folgende Sachen sicher:
 Eventuell hast du noch die alte Overlay-Version, probiere einmal das Skript für das Overlay neu zu installieren. Dannach sollte sich das Overlay automatisch alle 30 Sekunden updaten. Falls das nicht klappt, muss die Seite leider manuell neu geladen werden, um ein Update zu erhalten.
 
 ## Wie kann ich das Overlay auf dem Handy nutzen?
-Ne, leider ist das nicht möglich und wird auch in Zukunft nicht möglich sein.
+Wir haben dir eine [Anleitung](https://github.com/PlaceDE-Official/pixel/blob/main/anleitung_overlay_bot_mobile.md#anleitung-placede-overlayuserbot-mobilger%C3%A4te-credits-yanina0000--zoriot) zusammengeschrieben. Bei Fragen erstelle bitte einen Forum Post in [place-tech-support](https://discord.com/channels/297765871122907136/1087899758665924659).
 
 ## Wieso ist der Pixel im Overlay falsch?
 Das liegt daran, dass die Vorlage einen Fehler enthält. Um das zu beheben muss sich ein Designer an die Vorlage setzen und sie reparieren.
 
 ## Setzt das Overlay automatisch Pixel?
 Nein, das ist nicht der Zweck des Overlays. Das Overlay ist nur als Hilfe zum Pixeln gedacht. Es gibt aber schon einen Bot, wessen Anleitung [hier](https://place.army/) einsehbar ist.
+
+## Wo findet ich die aktuellsten FAQ's?
+Diese findest du auf dem Discord Server unter [faq](https://discord.com/channels/297765871122907136/1131548937262735471/1132026197224730734)
