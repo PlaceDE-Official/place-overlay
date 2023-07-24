@@ -11,8 +11,12 @@
 // @grant        none
 // ==/UserScript==
 
-let width = "2500px";
-let height = "2000px";
+
+
+
+// Nach unten bewegt um eine automatische erkennung zu machen
+//const height = "2000px";
+//const width = "2500px";
 var button = null;
 
 if (window.top !== window.self) {
@@ -39,6 +43,24 @@ if (window.top !== window.self) {
       } catch(e){}
     }
 
+
+    // hier ist der die deffenierung von
+    // positionContainer, mainContainer, width, height und canvasElement
+    // canvasElement ist das canvas selbst....
+    const mainContainer = document
+      .querySelector('garlic-bread-embed')
+      .shadowRoot.querySelector('.layout');
+    const positionContainer = mainContainer
+      .querySelector('garlic-bread-canvas')
+      .shadowRoot.querySelector('.container');
+
+    // Das Canvas-Element aus dem positionContainer auswählen
+    const canvasElement = positionContainer.querySelector('canvas');
+
+    // Breite und Höhe des Canvas-Elements extrahieren
+    const width = canvasElement.width + "px";
+    const height = canvasElement.height + "px";
+
     const img = document.createElement('img');
     img.style.pointerEvents = 'none';
     img.style.position = 'absolute';
@@ -55,12 +77,7 @@ if (window.top !== window.self) {
       img.style.opacity = oState.opacity / 100;
     };
 
-    const mainContainer = document
-      .querySelector('garlic-bread-embed')
-      .shadowRoot.querySelector('.layout');
-    const positionContainer = mainContainer
-      .querySelector('garlic-bread-canvas')
-      .shadowRoot.querySelector('.container');
+    // positionContainer und mainContainer wurden nach oben verschoben um es hier nicht nochmal zu deklarieren
     positionContainer.appendChild(img);
 
     // ==============================================
