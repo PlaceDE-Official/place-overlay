@@ -21,9 +21,10 @@ if(window.top !== window.self) {
   window.addEventListener("load", () => {
     const canvasContainer = document
       .querySelector("garlic-bread-embed")
-      .shadowRoot.querySelector("div.layout").querySelector("garlic-bread-canvas")
-      .shadowRoot.querySelector("div.container");
+      .shadowRoot.querySelector("garlic-bread-canvas")
+      .shadowRoot.querySelector(".container");
     const canvas = canvasContainer.querySelector("canvas");
+
     overlayImage = document.createElement("img");
     overlayImage.src = src;
     overlayImage.style = style;
