@@ -164,7 +164,7 @@ addEventListener('load', () => {
 	// ==============================================
 	// Canvas size observer
 
-	const canvas = positionContainer.querySelector('canvas');
+	const canvas = positionContainer.querySelector('#chocolate-canvas');
 
 	const syncSize = () => {
 		if (!img.naturalWidth || !img.naturalHeight) return;
