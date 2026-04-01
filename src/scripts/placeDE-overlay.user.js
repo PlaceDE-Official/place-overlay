@@ -12,9 +12,11 @@
 // @run-at   document-start
 // ==/UserScript==
 
-const updateEvery = 30 * 1000;
-const src = 'https://placede-official.github.io/pixel/overlay_target.png';
-const style = 'position: absolute;left: 0;top: 0;image-rendering: pixelated;width: 1000px;height: 1000px;';
+const UPDATE_INTERVAL = 30 * 1000; // ms
+const OVERLAY_URL = 'https://placede-official.github.io/pixel/overlay_target.png';
+const SCALE_FACTOR = 3;
+
+const style = 'position: absolute;left: 0;top: 0;image-rendering: pixelated;z-index: 10';
 
 let overlayImage = null;
 addEventListener(
@@ -23,29 +25,29 @@ addEventListener(
 		console.log('[PLACEDE] Overlay loading...');
 
 		const canvasContainer = document.querySelector('#canvas-container');
-		const canvas = canvasContainer.querySelector('canvas');
+		const canvas = canvasContainer.querySelector('#chocolate-canvas');
 
 		overlayImage = document.createElement('img');
 		overlayImage.style = style;
 
-		const updateImage = () => (overlayImage.src = src + '?' + Date.now());
+		const syncSize = () => {
+			if (!overlayImage.naturalWidth || !overlayImage.naturalHeight) return;
+			const scale = canvas.clientWidth / canvas.width;
+			overlayImage.style.width = (overlayImage.naturalWidth / SCALE_FACTOR) * scale + 'px';
+			overlayImage.style.height = (overlayImage.naturalHeight / SCALE_FACTOR) * scale + 'px';
+		};
+
+		overlayImage.addEventListener('load', syncSize);
+
+		const updateImage = () => (overlayImage.src = OVERLAY_URL + '?' + Date.now());
 
 		updateImage();
-		setInterval(updateImage, updateEvery);
+		setInterval(updateImage, UPDATE_INTERVAL);
 		canvasContainer.appendChild(overlayImage);
 
-		const canvasObserver = new MutationObserver((mutations) => {
-			mutations.forEach((mutation) => {
-				if (mutation.type === 'attributes') {
-					overlayImage.style.width = mutation.target.getAttribute('width') + 'px';
-					overlayImage.style.height = mutation.target.getAttribute('height') + 'px';
-				}
-			});
-		});
-
-		canvasObserver.observe(canvas, {
-			attributes: true
-		});
+		const canvasObserver = new MutationObserver(syncSize);
+		canvasObserver.observe(canvas, { attributes: true });
+		new ResizeObserver(syncSize).observe(canvas);
 	},
 	false
 );

@@ -116,8 +116,8 @@ addEventListener('load', () => {
 	// ==============================================
 	const STORAGE_KEY = 'place-germany-2026-ostate';
 	const OVERLAYS = [
-		['https://placede-official.github.io/pixel/overlay_target.png', 'kleine Pixel'],
-		['https://placede-official.github.io/pixel/default_target.png', 'große Pixel']
+		['https://placede-official.github.io/pixel/overlay_target.png', 'kleine Pixel', 3],
+		['https://placede-official.github.io/pixel/default_target.png', 'große Pixel', 1]
 	];
 	const getConfig = (text) => {
 		return text + '?' + Date.now();
@@ -165,18 +165,20 @@ addEventListener('load', () => {
 	// Canvas size observer
 
 	const canvas = positionContainer.querySelector('canvas');
-	const canvasObserver = new MutationObserver((mutations) => {
-		mutations.forEach((mutation) => {
-			if (mutation.type === 'attributes') {
-				img.style.width = mutation.target.getAttribute('width') + 'px';
-				img.style.height = mutation.target.getAttribute('height') + 'px';
-			}
-		});
-	});
 
-	canvasObserver.observe(canvas, {
-		attributes: true
-	});
+	const syncSize = () => {
+		if (!img.naturalWidth || !img.naturalHeight) return;
+		const scale = canvas.clientWidth / canvas.width;
+		const divisor = OVERLAYS[oState.overlayIdx][2];
+		img.style.width = (img.naturalWidth / divisor) * scale + 'px';
+		img.style.height = (img.naturalHeight / divisor) * scale + 'px';
+	};
+
+	img.addEventListener('load', syncSize);
+
+	const canvasObserver = new MutationObserver(syncSize);
+	canvasObserver.observe(canvas, { attributes: true });
+	new ResizeObserver(syncSize).observe(canvas);
 
 	// Add style to shadow root
 	const styleContainer = document.createElement('style');
