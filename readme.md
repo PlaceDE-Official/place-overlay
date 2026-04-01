@@ -37,7 +37,7 @@ Das Ganze sieht dann in Tampermonkey (abhängig von der gewählten Variante) ung
 ------
 
 ## Overlay updaten
-Um das Overlay auf eine neue Version zu aktualisieren (nicht die Daten, sondern das Skript) klickt ihr einfach oben bei 3. auf den entsprechenden Link.
+Um das Overlay auf eine neue Version zu aktualisieren (nicht die Daten, sondern das Skript) klickt ihr einfach oben bei 4. auf den entsprechenden Link.
 
 --------
 
