@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [placeDE] r/tyles 2026 Extended
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Script that adds a button to toggle an hardcoded image shown in the 2026's r/tyles canvas
 // @author       max-was-here and placeDE Devs
 // @match        https://tyles.place/*
@@ -135,17 +135,34 @@ addEventListener('load', () => {
 		} catch {}
 	}
 
+	const mainContainer = document.querySelector('#app-container');
+	const canvasContainer = mainContainer.querySelector('#canvas-container');
+	const cursorCanvas = mainContainer.querySelector('#cursor-canvas');
+	const canvas = canvasContainer.querySelector('#chocolate-canvas');
+
+	// ==============================================
+	// Overlay image
+
 	const img = document.createElement('img');
 	img.style.pointerEvents = 'none';
 	img.style.position = 'absolute';
 	img.style.imageRendering = 'pixelated';
-	img.style.opacity = oState.opacity;
 	img.style.top = '0px';
 	img.style.left = '0px';
 	img.style.zIndex = '100';
+	img.style.maxWidth = 'none';
+
+	const syncSize = () => {
+		if (!img.naturalWidth || !img.naturalHeight) return;
+		const divisor = OVERLAYS[oState.overlayIdx][2];
+		img.style.width = img.naturalWidth / divisor + 'px';
+		img.style.height = img.naturalHeight / divisor + 'px';
+	};
+
 	img.onload = () => {
 		console.log('[PLACEDE] img loaded');
 		img.style.opacity = oState.opacity / 100;
+		syncSize();
 	};
 
 	const updateImage = () => {
@@ -157,27 +174,32 @@ addEventListener('load', () => {
 
 	setInterval(updateImage, 30000);
 
-	const mainContainer = document.querySelector('#app-container');
-	const positionContainer = mainContainer.querySelector('#canvas-container');
-	positionContainer.appendChild(img);
+	// Place overlay above cursor-canvas by creating a sibling container
+	const overlayContainer = document.createElement('div');
+	overlayContainer.style.pointerEvents = 'none';
+	overlayContainer.style.position = 'absolute';
+	overlayContainer.style.top = '0';
+	overlayContainer.style.left = '0';
+	overlayContainer.style.zIndex = 10;
+
+	const syncTransform = () => {
+		overlayContainer.style.zoom = canvasContainer.style.zoom;
+		overlayContainer.style.transform = canvasContainer.style.transform;
+	};
+	syncTransform();
+
+	new MutationObserver(syncTransform).observe(canvasContainer, {
+		attributes: true,
+		attributeFilter: ['style']
+	});
+
+	cursorCanvas.parentElement.appendChild(overlayContainer);
+	overlayContainer.appendChild(img);
 
 	// ==============================================
 	// Canvas size observer
 
-	const canvas = positionContainer.querySelector('#chocolate-canvas');
-
-	const syncSize = () => {
-		if (!img.naturalWidth || !img.naturalHeight) return;
-		const scale = canvas.clientWidth / canvas.width;
-		const divisor = OVERLAYS[oState.overlayIdx][2];
-		img.style.width = (img.naturalWidth / divisor) * scale + 'px';
-		img.style.height = (img.naturalHeight / divisor) * scale + 'px';
-	};
-
-	img.addEventListener('load', syncSize);
-
-	const canvasObserver = new MutationObserver(syncSize);
-	canvasObserver.observe(canvas, { attributes: true });
+	new MutationObserver(syncSize).observe(canvas, { attributes: true });
 	new ResizeObserver(syncSize).observe(canvas);
 
 	// Add style to shadow root
