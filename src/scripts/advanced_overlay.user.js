@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [placeDE] r/tyles 2026 Extended
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Script that adds a button to toggle an hardcoded image shown in the 2026's r/tyles canvas
 // @author       max-was-here and placeDE Devs
 // @match        https://tyles.place/*
@@ -45,6 +45,11 @@ const AO_STYLE = `
   .ao-button:hover {
     background: linear-gradient(rgba(0, 0, 0, 0.2) 0px, rgba(0, 0, 0, 0.2) 0px), rgb(255, 255, 255);
   }
+  .ao-slider-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
   .ao-opacity-wrapper {
     position: relative;
     display: flex;
@@ -52,15 +57,40 @@ const AO_STYLE = `
     justify-content: center;
     flex-direction: column;
     width: 44px;
-    height: 132px;
     background-color: #fff;
     color: #000;
     font-family: var(--garlic-bread-font-pixel);
     white-space: nowrap;
     box-sizing: border-box;
   }
-  .ao-opacity-wrapper::before,
-  .ao-opacity-wrapper::after {
+  .ao-slider-label {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #000;
+    width: 100%;
+    height: 36px;
+    pointer-events: none;
+  }
+  .ao-slider-label svg {
+    width: 22px;
+    height: 22px;
+  }
+  .ao-slider-divider {
+    width: calc(100% - 8px);
+    height: 1px;
+    background: rgba(0, 0, 0, 0.15);
+  }
+  .ao-slider-track {
+    position: relative;
+    width: 100%;
+    height: 132px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ao-slider-track::before,
+  .ao-slider-track::after {
     display: block;
     position: absolute;
     z-index: 99;
@@ -72,11 +102,11 @@ const AO_STYLE = `
     pointer-events: none;
     mix-blend-mode: darken;
   }
-  .ao-opacity-wrapper::before {
+  .ao-slider-track::before {
     content: "+";
     top: -6px;
   }
-  .ao-opacity-wrapper::after {
+  .ao-slider-track::after {
     content: "−";
     bottom: -2px;
   }
@@ -106,6 +136,93 @@ const AO_STYLE = `
     cursor: pointer;
     border-radius: 0;
   }
+  .ao-button.ao-active,
+  .ao-slider-label.ao-active {
+    background-color: rgb(0, 163, 104);
+    color: #fff;
+  }
+  .ao-button.ao-active:hover,
+  .ao-slider-label.ao-active:hover {
+    background: linear-gradient(rgba(0, 0, 0, 0.2) 0px, rgba(0, 0, 0, 0.2) 0px), rgb(0, 163, 104);
+  }
+  .ao-monitor-panel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 100001;
+    font-family: monospace;
+    font-size: 11px;
+    min-width: 180px;
+  }
+  .ao-monitor-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 30vh;
+    overflow-y: auto;
+    overflow-y: overlay;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+    transition: max-height 0.25s ease, mask-image 0.25s ease, -webkit-mask-image 0.25s ease;
+  }
+  .ao-monitor-list::-webkit-scrollbar {
+    width: 4px;
+  }
+  .ao-monitor-list::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+  .ao-monitor-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .ao-monitor-panel:hover .ao-monitor-list,
+  .ao-monitor-panel.ao-monitor-pinned .ao-monitor-list {
+    max-height: calc(100vh - 80px);
+    scrollbar-color: rgba(255,255,255,0.3) transparent;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .ao-monitor-panel:hover .ao-monitor-list::-webkit-scrollbar-thumb,
+  .ao-monitor-panel.ao-monitor-pinned .ao-monitor-list::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+  }
+  .ao-monitor-row {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 6px;
+    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.9);
+    color: #fff;
+    overflow: hidden;
+    cursor: default;
+    flex-shrink: 0;
+  }
+  .ao-monitor-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .ao-monitor-name {
+    position: relative;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+  }
+  .ao-monitor-pct {
+    position: relative;
+    margin-left: 8px;
+    white-space: nowrap;
+  }
 `;
 
 let toggleSmallPixelButton;
@@ -114,7 +231,6 @@ let toggleFullPixelButton;
 addEventListener('load', () => {
 	console.log('[PLACEDE] Extended overlay loading...');
 
-	// ==============================================
 	const STORAGE_KEY = 'place-germany-2026-ostate';
 	const OVERLAYS = [
 		['https://placede-official.github.io/pixel/overlay_target.png', 'kleine Pixel', 3],
@@ -126,7 +242,10 @@ addEventListener('load', () => {
 
 	let oState = {
 		opacity: 100,
-		overlayIdx: 0
+		monitorOpacity: 100,
+		overlayIdx: 0,
+		monitorEnabled: false,
+		monitorUrl: 'wss://placede-monitor.devminer.xyz'
 	};
 
 	const oStateStorage = localStorage.getItem(STORAGE_KEY);
@@ -142,7 +261,6 @@ addEventListener('load', () => {
 	const canvas = canvasContainer.querySelector('#chocolate-canvas');
 	const uiLayer = mainContainer.querySelector('#ui-layer');
 
-	// ==============================================
 	// Overlay image
 
 	const img = document.createElement('img');
@@ -198,19 +316,351 @@ addEventListener('load', () => {
 	cursorCanvas.parentElement.appendChild(overlayContainer);
 	overlayContainer.appendChild(img);
 
-	// ==============================================
 	// Canvas size observer
-
 	new MutationObserver(syncSize).observe(canvas, { attributes: true });
 	new ResizeObserver(syncSize).observe(canvas);
 
-	// Add style to shadow root
+	// Monitor mode (for getting outlines and diff updates)
+	const monitorCanvas = document.createElement('canvas');
+	monitorCanvas.style.pointerEvents = 'none';
+	monitorCanvas.style.position = 'absolute';
+	monitorCanvas.style.top = '0px';
+	monitorCanvas.style.left = '0px';
+	monitorCanvas.style.zIndex = '101';
+	monitorCanvas.style.display = 'none';
+	overlayContainer.appendChild(monitorCanvas);
+
+	const monitorPanel = document.createElement('div');
+	monitorPanel.classList.add('ao-monitor-panel');
+	monitorPanel.addEventListener('click', () => {
+		monitorPanel.classList.toggle('ao-monitor-pinned');
+	});
+	mainContainer.appendChild(monitorPanel);
+
+	const monitorList = document.createElement('div');
+	monitorList.classList.add('ao-monitor-list');
+	monitorPanel.appendChild(monitorList);
+
+	const updateMonitorPanel = () => {
+		const sorted = [...monitorArtworks.values()].sort((a, b) => a.completion - b.completion);
+		monitorList.innerHTML = '';
+
+		for (const art of sorted) {
+			const hue = (art.completion / 100) * 120;
+			const row = document.createElement('div');
+			row.classList.add('ao-monitor-row');
+
+			const bar = document.createElement('div');
+			bar.classList.add('ao-monitor-bar');
+			bar.style.width = art.completion + '%';
+			bar.style.background = `hsl(${hue}, 100%, 45%)`;
+
+			const name = document.createElement('span');
+			name.classList.add('ao-monitor-name');
+			name.textContent = art.name;
+			name.title = art.name;
+
+			let pctText = art.completion.toFixed(1) + '%';
+			if (art.eta_seconds != null && art.eta_seconds > 0) {
+				const mins = Math.floor(art.eta_seconds / 60);
+				const secs = Math.floor(art.eta_seconds % 60);
+				pctText += mins > 0 ? ` (${mins}m${secs}s)` : ` (${secs}s)`;
+			}
+
+			const pct = document.createElement('span');
+			pct.classList.add('ao-monitor-pct');
+			pct.textContent = pctText;
+
+			row.appendChild(bar);
+			row.appendChild(name);
+			row.appendChild(pct);
+			monitorList.appendChild(row);
+		}
+	};
+
+	let monitorWs = null;
+	let monitorReconnectTimer = null;
+	const monitorArtworks = new Map();
+	let hoveredArtwork = null;
+	let fadingOutArtwork = null; // stays at full alpha during fade-out
+	let hoverFadeFrom = 0;
+	let hoverFadeTarget = 0;
+	let hoverFadeStart = performance.now();
+	let hoverFadeAnim = null;
+	const FADE_DURATION = 150;
+
+	const getHoverFade = () => {
+		const t = Math.min(1, (performance.now() - hoverFadeStart) / FADE_DURATION);
+		return hoverFadeFrom + (hoverFadeTarget - hoverFadeFrom) * t;
+	};
+
+	const animateHoverFade = () => {
+		drawMonitorOutlines();
+		if (getHoverFade() !== hoverFadeTarget) {
+			hoverFadeAnim = requestAnimationFrame(animateHoverFade);
+		} else {
+			hoverFadeAnim = null;
+			fadingOutArtwork = null;
+		}
+	};
+
+	const setHoverFadeTarget = (target) => {
+		hoverFadeFrom = getHoverFade();
+		hoverFadeTarget = target;
+		hoverFadeStart = performance.now();
+		if (hoverFadeAnim !== null) cancelAnimationFrame(hoverFadeAnim);
+		hoverFadeAnim = requestAnimationFrame(animateHoverFade);
+	};
+
+	const drawMonitorOutlines = () => {
+		const w = canvas.width;
+		const h = canvas.height;
+		if (!w || !h) return;
+
+		const rect = canvas.getBoundingClientRect();
+		const displayScale = rect.width / w;
+		const dpr = window.devicePixelRatio || 1;
+		const maxDim = 4096;
+		const scale = Math.min(displayScale * dpr, maxDim / Math.max(w, h)) * 2;
+
+		const pad = 14; // pixels of padding for labels outside canvas bounds
+		monitorCanvas.width = Math.round((w + pad * 2) * scale);
+		monitorCanvas.height = Math.round((h + pad * 2) * scale);
+		const cssW = parseFloat(canvas.style.width) || w;
+		const cssH = parseFloat(canvas.style.height) || h;
+		const cssPad = pad * (cssW / w);
+		monitorCanvas.style.width = cssW + cssPad * 2 + 'px';
+		monitorCanvas.style.height = cssH + cssPad * 2 + 'px';
+		monitorCanvas.style.left = -cssPad + 'px';
+		monitorCanvas.style.top = -cssPad + 'px';
+
+		monitorCanvas.style.opacity = oState.monitorOpacity / 100;
+
+		const ctx = monitorCanvas.getContext('2d');
+		ctx.scale(scale, scale);
+		ctx.translate(pad, pad);
+
+		const currentFade = getHoverFade();
+		for (const art of monitorArtworks.values()) {
+			const isHovered = hoveredArtwork === art.name;
+			const isKeepVisible = art.name === fadingOutArtwork;
+			const alpha = isHovered || isKeepVisible ? 1 : 1 - currentFade;
+			if (alpha <= 0) continue;
+
+			ctx.globalAlpha = alpha;
+
+			const pct = art.completion;
+			// Color: red (0°) → orange (30°) → green (120°) via HSL
+			const hue = (pct / 100) * 120;
+			const color = `hsl(${hue}, 100%, 45%)`;
+
+			ctx.strokeStyle = color;
+			ctx.lineWidth = 1;
+			ctx.strokeRect(art.x - 0.5, art.y - 0.5, art.width + 1, art.height + 1);
+
+			ctx.font = '3px monospace';
+
+			const pctLabel = pct.toFixed(1) + '%';
+			const pctMetrics = ctx.measureText(pctLabel);
+			const pctH = 4;
+			const pctW = pctMetrics.width + 2;
+			const pctX = art.x + art.width - pctW;
+			const pctY = art.y;
+
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+			ctx.fillRect(pctX, pctY, pctW, pctH);
+			ctx.fillStyle = color;
+			ctx.fillText(pctLabel, pctX + 1, pctY + 3);
+
+			if (art.eta_seconds != null && art.eta_seconds > 30) {
+				const mins = Math.floor(art.eta_seconds / 60);
+				const secs = Math.floor(art.eta_seconds % 60);
+				const etaLabel = mins > 0 ? `${mins}m${secs}s` : `${secs}s`;
+				const etaMetrics = ctx.measureText(etaLabel);
+				const etaW = etaMetrics.width + 2;
+				const etaH = 4;
+				const etaX = art.x;
+				const etaY = art.y;
+
+				ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+				ctx.fillRect(etaX, etaY, etaW, etaH);
+				ctx.fillStyle = color;
+				ctx.fillText(etaLabel, etaX + 1, etaY + 3);
+			}
+
+			if (isHovered) {
+				ctx.font = '6px monospace';
+				const metrics = ctx.measureText(art.name);
+				const labelH = 7;
+				const labelW = metrics.width + 2;
+				const labelX = art.x;
+				const labelY = art.y - labelH;
+
+				ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+				ctx.fillRect(labelX, labelY, labelW, labelH);
+
+				ctx.fillStyle = color;
+				ctx.fillText(art.name, labelX + 1, labelY + 5.5);
+			}
+		}
+		ctx.globalAlpha = 1;
+	};
+
+	document.addEventListener('mousemove', (e) => {
+		if (!oState.monitorEnabled || monitorArtworks.size === 0) return;
+
+		// figure out which canvas pixel the user is hovering over, so we can select
+		// the artwork
+
+		const rect = canvas.getBoundingClientRect();
+		const px = ((e.clientX - rect.left) / rect.width) * canvas.width;
+		const py = ((e.clientY - rect.top) / rect.height) * canvas.height;
+
+		let hit = null;
+		for (const art of monitorArtworks.values()) {
+			if (px >= art.x && px < art.x + art.width && py >= art.y && py < art.y + art.height) {
+				hit = art.name;
+				break;
+			}
+		}
+
+		if (hit !== hoveredArtwork) {
+			const wasHovering = hoveredArtwork !== null;
+			if (wasHovering && !hit) {
+				fadingOutArtwork = hoveredArtwork;
+			}
+			hoveredArtwork = hit;
+			if (!!hit !== wasHovering) {
+				setHoverFadeTarget(hit ? 1 : 0);
+			} else {
+				drawMonitorOutlines();
+			}
+		}
+	});
+
+	let monitorDrawPending = false;
+	const scheduleMonitorRedraw = () => {
+		if (!oState.monitorEnabled || monitorDrawPending) return;
+		monitorDrawPending = true;
+		requestAnimationFrame(() => {
+			monitorDrawPending = false;
+			drawMonitorOutlines();
+		});
+	};
+
+	new MutationObserver(scheduleMonitorRedraw).observe(canvas, { attributes: true });
+	new ResizeObserver(scheduleMonitorRedraw).observe(canvas);
+	new MutationObserver(scheduleMonitorRedraw).observe(canvasContainer, {
+		attributes: true,
+		attributeFilter: ['style']
+	});
+
+	const monitorConnect = () => {
+		if (monitorWs) {
+			monitorWs.onclose = null;
+			monitorWs.close();
+		}
+		if (monitorReconnectTimer) {
+			clearTimeout(monitorReconnectTimer);
+			monitorReconnectTimer = null;
+		}
+
+		console.log('[PLACEDE] Monitor connecting to', oState.monitorUrl);
+		monitorWs = new WebSocket(oState.monitorUrl);
+
+		monitorWs.onopen = () => {
+			console.log('[PLACEDE] Monitor connected');
+		};
+
+		monitorWs.onmessage = (event) => {
+			let msg;
+			try {
+				msg = JSON.parse(event.data);
+			} catch {
+				return;
+			}
+
+			if (msg.type === 'full') {
+				monitorArtworks.clear();
+				for (const a of msg.artworks) {
+					monitorArtworks.set(a.name, a);
+				}
+			} else if (msg.type === 'update') {
+				for (const a of msg.artworks) {
+					const existing = monitorArtworks.get(a.name);
+					if (existing) {
+						existing.correct_pixels = a.correct_pixels;
+						existing.completion = a.completion;
+						existing.eta_seconds = a.eta_seconds;
+					}
+				}
+			}
+
+			drawMonitorOutlines();
+			updateMonitorPanel();
+		};
+
+		monitorWs.onclose = () => {
+			console.log('[PLACEDE] Monitor disconnected, reconnecting in 3s...');
+			monitorReconnectTimer = setTimeout(monitorConnect, 3000);
+		};
+
+		monitorWs.onerror = (err) => {
+			console.error('[PLACEDE] Monitor error:', err);
+			monitorWs.close();
+		};
+	};
+
+	const monitorDisconnect = () => {
+		if (monitorReconnectTimer) {
+			clearTimeout(monitorReconnectTimer);
+			monitorReconnectTimer = null;
+		}
+		if (monitorWs) {
+			monitorWs.onclose = null;
+			monitorWs.close();
+			monitorWs = null;
+		}
+		monitorArtworks.clear();
+		monitorList.innerHTML = '';
+		const ctx = monitorCanvas.getContext('2d');
+		ctx.clearRect(0, 0, monitorCanvas.width, monitorCanvas.height);
+	};
+
+	let monitorSliderEl = null;
+
+	const updateMonitorSliderVisibility = () => {
+		if (!monitorSliderEl) return;
+		const track = monitorSliderEl.querySelector('.ao-slider-track');
+		const divider = monitorSliderEl.querySelector('.ao-slider-divider');
+		if (track) track.classList.toggle('ao-hidden', !oState.monitorEnabled);
+		if (divider) divider.classList.toggle('ao-hidden', !oState.monitorEnabled);
+	};
+
+	const toggleMonitor = (button) => {
+		oState.monitorEnabled = !oState.monitorEnabled;
+		monitorCanvas.style.display = oState.monitorEnabled ? 'block' : 'none';
+		monitorPanel.style.display = oState.monitorEnabled ? 'flex' : 'none';
+		button.classList.toggle('ao-active', oState.monitorEnabled);
+		updateMonitorSliderVisibility();
+
+		if (oState.monitorEnabled) {
+			monitorConnect();
+		} else {
+			monitorDisconnect();
+		}
+		saveState();
+	};
+
+	if (oState.monitorEnabled) {
+		monitorCanvas.style.display = 'block';
+		monitorPanel.style.display = 'flex';
+		monitorConnect();
+	}
+
 	const styleContainer = document.createElement('style');
 	styleContainer.innerHTML = AO_STYLE;
 	mainContainer.appendChild(styleContainer);
-
-	// ==============================================
-	// Add buttons to toggle overlay
 
 	const buttonsWrapper = document.createElement('div');
 	buttonsWrapper.classList.add('ao-wrapper');
@@ -270,10 +720,27 @@ addEventListener('load', () => {
 		return button;
 	};
 
-	const addSlider = (text, min, max, val, onChange) => {
+	const addSlider = (text, min, max, val, onChange, icon) => {
+		const group = document.createElement('div');
+		group.classList.add('ao-slider-group');
+		group.title = text;
+
 		const opacityWrapper = document.createElement('div');
 		opacityWrapper.classList.add('ao-opacity-wrapper', 'outlined', 'dropshadow');
-		opacityWrapper.title = text;
+
+		if (icon) {
+			const label = document.createElement('div');
+			label.classList.add('ao-slider-label');
+			label.innerHTML = icon;
+			opacityWrapper.appendChild(label);
+
+			const divider = document.createElement('div');
+			divider.classList.add('ao-slider-divider');
+			opacityWrapper.appendChild(divider);
+		}
+
+		const track = document.createElement('div');
+		track.classList.add('ao-slider-track');
 
 		const opacitySlider = document.createElement('input');
 		opacitySlider.classList.add('ao-opacity-slider');
@@ -282,10 +749,12 @@ addEventListener('load', () => {
 		opacitySlider.max = max;
 		opacitySlider.value = val;
 		opacitySlider.oninput = onChange;
-		opacitySlider.title = text;
 
-		opacityWrapper.appendChild(opacitySlider);
-		buttonsWrapper.appendChild(opacityWrapper);
+		track.appendChild(opacitySlider);
+		opacityWrapper.appendChild(track);
+		group.appendChild(opacityWrapper);
+		buttonsWrapper.appendChild(group);
+		return group;
 	};
 
 	// All icons are from https://www.svgrepo.com/ (MIT License)
@@ -323,5 +792,40 @@ addEventListener('load', () => {
 	);
 	updateSwitchButtonState();
 
-	addSlider('Opacity', 0, 100, oState.opacity, changeOpacity);
+	addSlider(
+		'Overlay Opacity',
+		0,
+		100,
+		oState.opacity,
+		changeOpacity,
+		`
+        <svg fill="#000000" viewBox="0 0 32.00 32.00" id="icon" xmlns="http://www.w3.org/2000/svg" data-darkreader-inline-fill="" style="--darkreader-inline-fill: var(--darkreader-background-000000, #000000);" transform="rotate(0)"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><defs><style>.cls-1{fill:none;}</style><style class="darkreader darkreader--sync" media="screen"></style></defs><title>opacity</title><rect x="6" y="6" width="4" height="4"></rect><rect x="10" y="10" width="4" height="4"></rect><rect x="14" y="6" width="4" height="4"></rect><rect x="22" y="6" width="4" height="4"></rect><rect x="6" y="14" width="4" height="4"></rect><rect x="14" y="14" width="4" height="4"></rect><rect x="22" y="14" width="4" height="4"></rect><rect x="6" y="22" width="4" height="4"></rect><rect x="14" y="22" width="4" height="4"></rect><rect x="22" y="22" width="4" height="4"></rect><rect x="18" y="10" width="4" height="4"></rect><rect x="10" y="18" width="4" height="4"></rect><rect x="18" y="18" width="4" height="4"></rect><rect id="_Transparent_Rectangle_" data-name="&lt;Transparent Rectangle&gt;" class="cls-1" width="32" height="32"></rect></g></svg>
+      `
+	);
+
+	const changeMonitorOpacity = (e) => {
+		oState.monitorOpacity = e.target.value;
+		monitorCanvas.style.opacity = oState.monitorOpacity / 100;
+		saveState();
+	};
+	monitorSliderEl = addSlider(
+		'Monitor Opacity',
+		0,
+		100,
+		oState.monitorOpacity,
+		changeMonitorOpacity,
+		`<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+			<rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+			<rect x="7" y="7" width="4" height="4" stroke="currentColor" stroke-width="1.5"/>
+			<rect x="13" y="12" width="5" height="6" stroke="currentColor" stroke-width="1.5"/>
+		</svg>`
+	);
+	const monitorToggle = monitorSliderEl.querySelector('.ao-slider-label');
+	monitorToggle.style.pointerEvents = 'auto';
+	monitorToggle.style.cursor = 'pointer';
+	monitorToggle.addEventListener('click', () => {
+		toggleMonitor(monitorToggle);
+	});
+	if (oState.monitorEnabled) monitorToggle.classList.add('ao-active');
+	updateMonitorSliderVisibility();
 });
