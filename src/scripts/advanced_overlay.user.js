@@ -26,6 +26,11 @@ const AO_STYLE = `
     gap: 12px;
     align-items: flex-end;
   }
+  @media (max-width : 600px) {
+    .ao-wrapper {
+      bottom: 85px;
+    }
+  }
   .ao-button {
     display: flex;
     justify-content: center;
