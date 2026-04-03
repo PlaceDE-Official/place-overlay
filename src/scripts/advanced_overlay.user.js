@@ -135,6 +135,7 @@ addEventListener('load', () => {
 	const canvasContainer = mainContainer.querySelector('#canvas-container');
 	const cursorCanvas = mainContainer.querySelector('#cursor-canvas');
 	const canvas = canvasContainer.querySelector('#chocolate-canvas');
+	const uiLayer = mainContainer.querySelector('#ui-layer');
 
 	// ==============================================
 	// Overlay image
@@ -209,7 +210,7 @@ addEventListener('load', () => {
 	const buttonsWrapper = document.createElement('div');
 	buttonsWrapper.classList.add('ao-wrapper');
 
-	mainContainer.appendChild(buttonsWrapper);
+	uiLayer.appendChild(buttonsWrapper);
 
 	const saveState = () => {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(oState));
