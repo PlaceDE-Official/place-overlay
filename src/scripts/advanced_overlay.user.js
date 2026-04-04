@@ -261,7 +261,7 @@ addEventListener('load', () => {
 
 	const addButton = (content, title, onClick) => {
 		const button = document.createElement('button');
-    button.classList.add('ao-button', 'outlined', 'dropshadow');
+		button.classList.add('ao-button', 'outlined', 'dropshadow');
 		button.onclick = onClick;
 		button.innerHTML = content;
 		button.title = title;
@@ -271,12 +271,8 @@ addEventListener('load', () => {
 	};
 
 	const addSlider = (text, min, max, val, onChange) => {
-    const opacityWrapper = document.createElement('div');
-    opacityWrapper.classList.add(
-      'ao-opacity-wrapper',
-      'outlined',
-      'dropshadow',
-    );
+		const opacityWrapper = document.createElement('div');
+		opacityWrapper.classList.add('ao-opacity-wrapper', 'outlined', 'dropshadow');
 		opacityWrapper.title = text;
 
 		const opacitySlider = document.createElement('input');
