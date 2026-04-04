@@ -34,7 +34,7 @@ Direktlinks:
 
 5. Nun drückt ihr in Tampermonkey nur noch auf "Updaten" oder "Neu installieren".  
    Das Ganze sieht dann in Tampermonkey (abhängig von der gewählten Variante) ungefähr so aus:
-    ![Addonseite von Tampermonkey](img/script-uebersicht.png)
+   ![Addonseite von Tampermonkey](img/script-uebersicht.png)
 
 ---
 
@@ -60,13 +60,13 @@ Der Kamera Button (1) erstellt ein Screenshot vom gesamten Canvas.
 
 Mit dem Knopf unten rechts (2) kann man zwischen mehreren Modi wechseln:
 
-1.  - Kleine Pixel (wie im normalen Overlay);
-    - Dies ist der Standardmodus, welcher bei jedem Neuladen der Seite aktiv ist
-    - ![Vorschau des erweiterten Overlays](img/advanced_overlay_sm.png)
+1.  -   Kleine Pixel (wie im normalen Overlay);
+    -   Dies ist der Standardmodus, welcher bei jedem Neuladen der Seite aktiv ist
+    -   ![Vorschau des erweiterten Overlays](img/advanced_overlay_sm.png)
 
-2.  - Volle Pixel, d.h. man sieht wie das Bild aussehen sollte und falsche Pixel werden vollständig überdeckt
-    - Dieser Modus eignet sich sehr gut, wenn man das ganze Bild ohne Fehler sehen will
-    - ![Vorschau des erweiterten Overlays](img/advanced_overlay_big.png)
+2.  -   Volle Pixel, d.h. man sieht wie das Bild aussehen sollte und falsche Pixel werden vollständig überdeckt
+    -   Dieser Modus eignet sich sehr gut, wenn man das ganze Bild ohne Fehler sehen will
+    -   ![Vorschau des erweiterten Overlays](img/advanced_overlay_big.png)
 
 Welcher Modus aktiv ist, erkennt man am Icon und anhand vom Tooltip des Buttons (2).
 
