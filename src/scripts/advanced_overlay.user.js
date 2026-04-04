@@ -26,6 +26,11 @@ const AO_STYLE = `
     gap: 12px;
     align-items: flex-end;
   }
+  @media (max-width : 600px) {
+    .ao-wrapper {
+      bottom: 85px;
+    }
+  }
   .ao-button {
     display: flex;
     justify-content: center;
@@ -34,8 +39,6 @@ const AO_STYLE = `
     width: 44px;
     background-color: #fff;
     color: #000;
-    border: var(--pixel-border);
-    box-shadow: var(--pixel-box-shadow);
     font-family: var(--garlic-bread-font-pixel);
     cursor: pointer;
   }
@@ -52,8 +55,6 @@ const AO_STYLE = `
     height: 132px;
     background-color: #fff;
     color: #000;
-    border: var(--pixel-border);
-    box-shadow: var(--pixel-box-shadow);
     font-family: var(--garlic-bread-font-pixel);
     white-space: nowrap;
     box-sizing: border-box;
@@ -139,6 +140,7 @@ addEventListener('load', () => {
 	const canvasContainer = mainContainer.querySelector('#canvas-container');
 	const cursorCanvas = mainContainer.querySelector('#cursor-canvas');
 	const canvas = canvasContainer.querySelector('#chocolate-canvas');
+	const uiLayer = mainContainer.querySelector('#ui-layer');
 
 	// ==============================================
 	// Overlay image
@@ -213,7 +215,7 @@ addEventListener('load', () => {
 	const buttonsWrapper = document.createElement('div');
 	buttonsWrapper.classList.add('ao-wrapper');
 
-	mainContainer.appendChild(buttonsWrapper);
+	uiLayer.appendChild(buttonsWrapper);
 
 	const saveState = () => {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(oState));
@@ -259,7 +261,7 @@ addEventListener('load', () => {
 
 	const addButton = (content, title, onClick) => {
 		const button = document.createElement('button');
-		button.classList.add('ao-button');
+		button.classList.add('ao-button', 'outlined', 'dropshadow');
 		button.onclick = onClick;
 		button.innerHTML = content;
 		button.title = title;
@@ -270,7 +272,7 @@ addEventListener('load', () => {
 
 	const addSlider = (text, min, max, val, onChange) => {
 		const opacityWrapper = document.createElement('div');
-		opacityWrapper.classList.add('ao-opacity-wrapper');
+		opacityWrapper.classList.add('ao-opacity-wrapper', 'outlined', 'dropshadow');
 		opacityWrapper.title = text;
 
 		const opacitySlider = document.createElement('input');
