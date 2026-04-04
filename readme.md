@@ -104,4 +104,3 @@ Um das zu beheben, muss sich ein Designer an die Vorlage setzen und sie reparier
 ### Setzt das Overlay automatisch Pixel?
 Nein, das ist nicht der Zweck des Overlays.
 Das Overlay ist nur als Hilfe zum Pixeln gedacht.
-Bei Interesse findest du [hier](https://place.army/) weitere Informationen.
