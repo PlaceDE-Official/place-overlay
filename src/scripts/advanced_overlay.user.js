@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         [placeDE] r/tyles 2026 Extended
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  Script that adds a button to toggle an hardcoded image shown in the 2026's r/tyles canvas
+// @version      1.3
+// @description  Script that adds a button to toggle an hardcoded image shown in the 2026's r/tyles canvas + auto color picker
 // @author       max-was-here and placeDE Devs
 // @match        https://tyles.place/*
 // @match        https://tyles.place
@@ -223,10 +223,96 @@ const AO_STYLE = `
     margin-left: 8px;
     white-space: nowrap;
   }
+
+  /* Auto color picker hint (bottom-left) */
+  .ao-color-hint {
+    position: absolute;
+    bottom: 25px;
+    left: 25px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 6px 10px;
+    font-family: var(--garlic-bread-font-pixel);
+    font-size: 0.75rem;
+    pointer-events: none;
+    z-index: 100002;
+  }
+  .ao-color-hint.ao-hidden {
+    display: none !important;
+  }
+  .ao-color-swatch {
+    width: 16px;
+    height: 16px;
+    border: 1px solid rgba(255,255,255,0.4);
+    flex-shrink: 0;
+  }
+  .ao-color-label {
+    white-space: nowrap;
+    color: #fff;
+  }
 `;
 
 let toggleSmallPixelButton;
 let toggleFullPixelButton;
+
+// ==============================================
+// Image Sampling
+
+const SAMPLE_URL = 'https://raw.githubusercontent.com/PlaceDE-Official/pixel/main/outputs/overlay.png';
+
+const sampleImg = document.createElement('img');
+sampleImg.crossOrigin = 'anonymous';
+
+const offscreenCanvas = document.createElement('canvas');
+const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+
+let sampleReady = false;
+
+const loadSampleImage = () => {
+	sampleReady = false;
+	sampleImg.src = SAMPLE_URL + '?' + Date.now();
+	console.log('[PLACEDE] loading 1:1 sample image…');
+};
+
+sampleImg.onload = () => {
+	offscreenCanvas.width  = sampleImg.naturalWidth;
+	offscreenCanvas.height = sampleImg.naturalHeight;
+	offscreenCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+	try {
+		offscreenCtx.drawImage(sampleImg, 0, 0);
+		sampleReady = true;
+		const cx = Math.floor(sampleImg.naturalWidth  / 2);
+		const cy = Math.floor(sampleImg.naturalHeight / 2);
+		const [r, g, b, a] = offscreenCtx.getImageData(cx, cy, 1, 1).data;
+		console.log(`[PLACEDE] sample image ready — ${offscreenCanvas.width}x${offscreenCanvas.height} | center pixel rgba(${r},${g},${b},${a})`);
+	} catch (e) {
+		sampleReady = false;
+		console.error('[PLACEDE] drawImage failed (CORS?). Pixel sampling disabled.', e);
+	}
+};
+
+sampleImg.onerror = (e) => {
+	sampleReady = false;
+	console.error('[PLACEDE] sample image failed to load:', e);
+};
+
+loadSampleImage();
+setInterval(loadSampleImage, 30000);
+
+// Converts r,g,b integers to '#RRGGBB'
+function rgbToHex(r, g, b) {
+	return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0').toUpperCase()).join('');
+}
+
+// Normalises whatever style.backgroundColor the browser gives (hex or rgb(...)) to '#RRGGBB'
+function normaliseBtnColor(css) {
+	if (/^#[0-9a-fA-F]{6}$/.test(css)) return css.toUpperCase();
+	const m = css.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+	if (m) return rgbToHex(+m[1], +m[2], +m[3]);
+	return null;
+}
 
 addEventListener('load', () => {
 	console.log('[PLACEDE] Extended overlay loading...');
@@ -245,7 +331,8 @@ addEventListener('load', () => {
 		monitorOpacity: 100,
 		overlayIdx: 0,
 		monitorEnabled: false,
-		monitorUrl: 'wss://placede-monitor.devminer.xyz'
+		monitorUrl: 'wss://placede-monitor.devminer.xyz',
+		autoColor: false,
 	};
 
 	const oStateStorage = localStorage.getItem(STORAGE_KEY);
@@ -261,6 +348,7 @@ addEventListener('load', () => {
 	const canvas = canvasContainer.querySelector('#chocolate-canvas');
 	const uiLayer = mainContainer.querySelector('#ui-layer');
 
+	// ==============================================
 	// Overlay image
 
 	const img = document.createElement('img');
@@ -291,10 +379,8 @@ addEventListener('load', () => {
 	};
 
 	updateImage();
-
 	setInterval(updateImage, 30000);
 
-	// Place overlay above cursor-canvas by creating a sibling container
 	const overlayContainer = document.createElement('div');
 	overlayContainer.style.pointerEvents = 'none';
 	overlayContainer.style.position = 'absolute';
@@ -316,11 +402,12 @@ addEventListener('load', () => {
 	cursorCanvas.parentElement.appendChild(overlayContainer);
 	overlayContainer.appendChild(img);
 
-	// Canvas size observer
 	new MutationObserver(syncSize).observe(canvas, { attributes: true });
 	new ResizeObserver(syncSize).observe(canvas);
 
-	// Monitor mode (for getting outlines and diff updates)
+	// ==============================================
+	// Monitor mode
+
 	const monitorCanvas = document.createElement('canvas');
 	monitorCanvas.style.pointerEvents = 'none';
 	monitorCanvas.style.position = 'absolute';
@@ -343,20 +430,18 @@ addEventListener('load', () => {
 
 	const getFormattedCompletionText = (artwork, outputEta=false) => {
 		let text = artwork.completion.toFixed(1) + '%';
-		// prepend ">" or "<", if rounded to 0.0% or 100.0%
 		if (text === '0.0%' && artwork.completion > 0) {
 			text = '> 0.0%';
 		} else if (text === '100.0%' && artwork.completion < 100) {
 			text = '< 100.0%';
 		}
-		// append ETA, if present and requested
 		if (outputEta && artwork.eta_seconds != null && artwork.eta_seconds > 0) {
 			const mins = Math.floor(artwork.eta_seconds / 60);
 			const secs = Math.floor(artwork.eta_seconds % 60);
 			text += mins > 0 ? ` (${mins}m${secs}s)` : ` (${secs}s)`;
 		}
 		return text;
-	}
+	};
 
 	const updateMonitorPanel = () => {
 		const sorted = [...monitorArtworks.values()].sort((a, b) => a.completion - b.completion);
@@ -378,7 +463,6 @@ addEventListener('load', () => {
 			name.title = art.name;
 
 			const pctText = getFormattedCompletionText(art, outputEta=true);
-
 			const pct = document.createElement('span');
 			pct.classList.add('ao-monitor-pct');
 			pct.textContent = pctText;
@@ -394,7 +478,7 @@ addEventListener('load', () => {
 	let monitorReconnectTimer = null;
 	const monitorArtworks = new Map();
 	let hoveredArtwork = null;
-	let fadingOutArtwork = null; // stays at full alpha during fade-out
+	let fadingOutArtwork = null;
 	let hoverFadeFrom = 0;
 	let hoverFadeTarget = 0;
 	let hoverFadeStart = performance.now();
@@ -435,7 +519,7 @@ addEventListener('load', () => {
 		const maxDim = 4096;
 		const scale = Math.min(displayScale * dpr, maxDim / Math.max(w, h)) * 2;
 
-		const pad = 14; // pixels of padding for labels outside canvas bounds
+		const pad = 14;
 		monitorCanvas.width = Math.round((w + pad * 2) * scale);
 		monitorCanvas.height = Math.round((h + pad * 2) * scale);
 		const cssW = parseFloat(canvas.style.width) || w;
@@ -445,7 +529,6 @@ addEventListener('load', () => {
 		monitorCanvas.style.height = cssH + cssPad * 2 + 'px';
 		monitorCanvas.style.left = -cssPad + 'px';
 		monitorCanvas.style.top = -cssPad + 'px';
-
 		monitorCanvas.style.opacity = oState.monitorOpacity / 100;
 
 		const ctx = monitorCanvas.getContext('2d');
@@ -462,7 +545,6 @@ addEventListener('load', () => {
 			ctx.globalAlpha = alpha;
 
 			const pct = art.completion;
-			// Color: red (0°) → orange (30°) → green (120°) via HSL
 			const hue = (pct / 100) * 120;
 			const color = `hsl(${hue}, 100%, 45%)`;
 
@@ -510,7 +592,6 @@ addEventListener('load', () => {
 
 				ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
 				ctx.fillRect(labelX, labelY, labelW, labelH);
-
 				ctx.fillStyle = color;
 				ctx.fillText(art.name, labelX + 1, labelY + 5.5);
 			}
@@ -520,10 +601,6 @@ addEventListener('load', () => {
 
 	document.addEventListener('mousemove', (e) => {
 		if (!oState.monitorEnabled || monitorArtworks.size === 0) return;
-
-		// figure out which canvas pixel the user is hovering over, so we can select
-		// the artwork
-
 		const rect = canvas.getBoundingClientRect();
 		const px = ((e.clientX - rect.left) / rect.width) * canvas.width;
 		const py = ((e.clientY - rect.top) / rect.height) * canvas.height;
@@ -538,9 +615,7 @@ addEventListener('load', () => {
 
 		if (hit !== hoveredArtwork) {
 			const wasHovering = hoveredArtwork !== null;
-			if (wasHovering && !hit) {
-				fadingOutArtwork = hoveredArtwork;
-			}
+			if (wasHovering && !hit) fadingOutArtwork = hoveredArtwork;
 			hoveredArtwork = hit;
 			if (!!hit !== wasHovering) {
 				setHoverFadeTarget(hit ? 1 : 0);
@@ -580,23 +655,15 @@ addEventListener('load', () => {
 		console.log('[PLACEDE] Monitor connecting to', oState.monitorUrl);
 		monitorWs = new WebSocket(oState.monitorUrl);
 
-		monitorWs.onopen = () => {
-			console.log('[PLACEDE] Monitor connected');
-		};
+		monitorWs.onopen = () => console.log('[PLACEDE] Monitor connected');
 
 		monitorWs.onmessage = (event) => {
 			let msg;
-			try {
-				msg = JSON.parse(event.data);
-			} catch {
-				return;
-			}
+			try { msg = JSON.parse(event.data); } catch { return; }
 
 			if (msg.type === 'full') {
 				monitorArtworks.clear();
-				for (const a of msg.artworks) {
-					monitorArtworks.set(a.name, a);
-				}
+				for (const a of msg.artworks) monitorArtworks.set(a.name, a);
 			} else if (msg.type === 'update') {
 				for (const a of msg.artworks) {
 					const existing = monitorArtworks.get(a.name);
@@ -607,7 +674,6 @@ addEventListener('load', () => {
 					}
 				}
 			}
-
 			drawMonitorOutlines();
 			updateMonitorPanel();
 		};
@@ -655,7 +721,6 @@ addEventListener('load', () => {
 		monitorPanel.style.display = oState.monitorEnabled ? 'flex' : 'none';
 		button.classList.toggle('ao-active', oState.monitorEnabled);
 		updateMonitorSliderVisibility();
-
 		if (oState.monitorEnabled) {
 			monitorConnect();
 		} else {
@@ -670,13 +735,100 @@ addEventListener('load', () => {
 		monitorConnect();
 	}
 
+	// ==============================================
+	// Auto color picker UI
+	
+	const colorHint = document.createElement('div');
+	colorHint.classList.add('ao-color-hint');
+	if (!oState.autoColor) colorHint.classList.add('ao-hidden');
+
+	const colorSwatch = document.createElement('div');
+	colorSwatch.classList.add('ao-color-swatch');
+
+	const colorLabel = document.createElement('span');
+	colorLabel.classList.add('ao-color-label');
+	colorLabel.textContent = '—';
+
+	colorHint.appendChild(colorSwatch);
+	colorHint.appendChild(colorLabel);
+	mainContainer.appendChild(colorHint);
+
+	// ==============================================
+	// Auto color picker logic
+
+	const readCoords = () => {
+		const pill = document.querySelector('.choco-1aw21lp');
+		if (!pill) return null;
+		const m = pill.textContent.match(/\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/);
+		if (!m) return null;
+		return { x: parseInt(m[1], 10), y: parseInt(m[2], 10) };
+	};
+
+	let lastCoordKey = '';
+	let lastColorKey = '';
+
+	const autoPickColor = () => {
+		if (!oState.autoColor) return;
+		if (!sampleReady) return;
+
+		const coords = readCoords();
+		if (!coords) return;
+
+		const coordKey = `${coords.x},${coords.y}`;
+		if (coordKey === lastCoordKey) return;
+		lastCoordKey = coordKey;
+
+		const { x, y } = coords;
+
+		if (x < 0 || y < 0 || x >= offscreenCanvas.width || y >= offscreenCanvas.height) {
+			colorSwatch.style.backgroundColor = 'transparent';
+			colorLabel.textContent = 'out of bounds';
+			console.log(`[PLACEDE] (${x}, ${y}) → out of bounds`);
+			return;
+		}
+
+		const [r, g, b, a] = offscreenCtx.getImageData(x, y, 1, 1).data;
+
+		if (a < 10) {
+			colorSwatch.style.backgroundColor = 'transparent';
+			colorLabel.textContent = 'transparent';
+			console.log(`[PLACEDE] (${x}, ${y}) → color: none`);
+			return;
+		}
+
+		const hex = rgbToHex(r, g, b);
+		console.log(`[PLACEDE] (${x}, ${y}) → ${hex}`);
+
+		if (hex === lastColorKey) return;
+		lastColorKey = hex;
+
+		// Find the palette button whose background matches this hex
+		const btn = [...document.querySelectorAll('.choco-8nok5g button[id^="color-"]')]
+			.find(b => normaliseBtnColor(b.style.backgroundColor) === hex);
+
+		colorSwatch.style.backgroundColor = hex;
+
+		if (!btn) {
+			colorLabel.textContent = hex + ' (no match)';
+			console.log(`[PLACEDE] no palette button found for ${hex}`);
+			return;
+		}
+
+		colorLabel.textContent = `${btn.id} ${hex}`;
+		btn.click();
+	};
+
+	setInterval(autoPickColor, 100);
+
+	// ==============================================
+	// Styles + buttons
+
 	const styleContainer = document.createElement('style');
 	styleContainer.innerHTML = AO_STYLE;
 	mainContainer.appendChild(styleContainer);
 
 	const buttonsWrapper = document.createElement('div');
 	buttonsWrapper.classList.add('ao-wrapper');
-
 	uiLayer.appendChild(buttonsWrapper);
 
 	const saveState = () => {
@@ -709,11 +861,8 @@ addEventListener('load', () => {
 
 	const exportScreenshot = () => {
 		const canvas = mainContainer.querySelector('canvas');
-		if (!canvas) {
-			return;
-		}
+		if (!canvas) return;
 		const imgUrl = canvas.toDataURL('image/png');
-
 		const downloadEl = document.createElement('a');
 		downloadEl.href = imgUrl;
 		downloadEl.download = `place-${Date.now()}.png`;
@@ -728,7 +877,6 @@ addEventListener('load', () => {
 		button.innerHTML = content;
 		button.title = title;
 		buttonsWrapper.appendChild(button);
-
 		return button;
 	};
 
@@ -769,52 +917,71 @@ addEventListener('load', () => {
 		return group;
 	};
 
-	// All icons are from https://www.svgrepo.com/ (MIT License)
+	// Screenshot
 	addButton(
-		`
-        <svg width="32px" height="32px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+		`<svg width="32px" height="32px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 16C13.6569 16 15 14.6569 15 13C15 11.3431 13.6569 10 12 10C10.3431 10 9 11.3431 9 13C9 14.6569 10.3431 16 12 16Z" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M3 16.8V9.2C3 8.0799 3 7.51984 3.21799 7.09202C3.40973 6.71569 3.71569 6.40973 4.09202 6.21799C4.51984 6 5.0799 6 6.2 6H7.25464C7.37758 6 7.43905 6 7.49576 5.9935C7.79166 5.95961 8.05705 5.79559 8.21969 5.54609C8.25086 5.49827 8.27836 5.44328 8.33333 5.33333C8.44329 5.11342 8.49827 5.00346 8.56062 4.90782C8.8859 4.40882 9.41668 4.08078 10.0085 4.01299C10.1219 4 10.2448 4 10.4907 4H13.5093C13.7552 4 13.8781 4 13.9915 4.01299C14.5833 4.08078 15.1141 4.40882 15.4394 4.90782C15.5017 5.00345 15.5567 5.11345 15.6667 5.33333C15.7216 5.44329 15.7491 5.49827 15.7803 5.54609C15.943 5.79559 16.2083 5.95961 16.5042 5.9935C16.561 6 16.6224 6 16.7454 6H17.8C18.9201 6 19.4802 6 19.908 6.21799C20.2843 6.40973 20.5903 6.71569 20.782 7.09202C21 7.51984 21 8.0799 21 9.2V16.8C21 17.9201 21 18.4802 20.782 18.908C20.5903 19.2843 20.2843 19.5903 19.908 19.782C19.4802 20 18.9201 20 17.8 20H6.2C5.0799 20 4.51984 20 4.09202 19.782C3.71569 19.5903 3.40973 19.2843 3.21799 18.908C3 18.4802 3 17.9201 3 16.8Z" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      `,
+        </svg>`,
 		'Screenshot',
 		exportScreenshot
 	);
 
+	// Auto color picker toggle
+	let autoColorButton;
+	const updateAutoColorButtonState = () => {
+		autoColorButton.classList.toggle('ao-active', oState.autoColor);
+		colorHint.classList.toggle('ao-hidden', !oState.autoColor);
+	};
+
+	autoColorButton = addButton(
+		`<svg width="32px" height="32px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3.5 20.5L3 21H2.5V20.5L3 20L3.5 20.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12.8284 5.17157L18.8284 11.1716M12.8284 5.17157L14.2426 3.75736C15.0237 2.97631 16.2900 2.97631 17.0711 3.75736L20.2426 6.92893C21.0237 7.70998 21.0237 8.97631 20.2426 9.75736L18.8284 11.1716M12.8284 5.17157L4.87868 13.1213C4.31607 13.6839 4 14.4467 4 15.2426V17C4 17.5523 4.44772 18 5 18H6.75736C7.55321 18 8.31607 17.6839 8.87868 17.1213L16.8284 9.17157M18.8284 11.1716L16.8284 9.17157M3.5 20.5L8 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`,
+		'Toggle Auto Color Picker',
+		() => {
+			oState.autoColor = !oState.autoColor;
+			updateAutoColorButtonState();
+			saveState();
+			if (oState.autoColor) {
+				lastCoordKey = '';
+				lastColorKey = '';
+				autoPickColor();
+			}
+		}
+	);
+	updateAutoColorButtonState();
+
+	// Overlay switch
 	toggleSmallPixelButton = addButton(
-		`
-        <svg fill="#000000" width="32px" height="32px" viewBox="0 0 256 256" id="Flat" xmlns="http://www.w3.org/2000/svg">
+		`<svg fill="#000000" width="32px" height="32px" viewBox="0 0 256 256" id="Flat" xmlns="http://www.w3.org/2000/svg">
           <path d="M168,96v64a7.99977,7.99977,0,0,1-8,8H96a7.99977,7.99977,0,0,1-8-8V96a7.99977,7.99977,0,0,1,8-8h64A7.99977,7.99977,0,0,1,168,96Zm56-48V208a16.01833,16.01833,0,0,1-16,16H48a16.01833,16.01833,0,0,1-16-16V48A16.01833,16.01833,0,0,1,48,32H208A16.01833,16.01833,0,0,1,224,48ZM208.01025,207.99953,208,48H48V208H208Z"/>
-        </svg>
-      `,
+        </svg>`,
 		`Switch Overlay\n(kleine Pixel)`,
 		switchOverlay
 	);
 	toggleFullPixelButton = addButton(
-		`
-        <svg fill="#000000" width="32px" height="32px" viewBox="0 0 256 256" id="Flat" xmlns="http://www.w3.org/2000/svg">
-          <g opacity="1">
-            <rect x="40" y="40" width="176" height="176" rx="8"/>
-          </g>
+		`<svg fill="#000000" width="32px" height="32px" viewBox="0 0 256 256" id="Flat" xmlns="http://www.w3.org/2000/svg">
+          <g opacity="1"><rect x="40" y="40" width="176" height="176" rx="8"/></g>
           <path d="M208,224H48a16.018,16.018,0,0,1-16-16V48A16.0181,16.0181,0,0,1,48,32H208a16.0181,16.0181,0,0,1,16,16V208A16.018,16.018,0,0,1,208,224ZM48,48V208H208l.01-.00049L208,48Z"/>
-        </svg>
-      `,
+        </svg>`,
 		`Switch Overlay\n(große Pixel)`,
 		switchOverlay
 	);
 	updateSwitchButtonState();
 
+	// Overlay opacity slider
 	addSlider(
 		'Overlay Opacity',
 		0,
 		100,
 		oState.opacity,
 		changeOpacity,
-		`
-        <svg fill="#000000" viewBox="0 0 32.00 32.00" id="icon" xmlns="http://www.w3.org/2000/svg" data-darkreader-inline-fill="" style="--darkreader-inline-fill: var(--darkreader-background-000000, #000000);" transform="rotate(0)"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><defs><style>.cls-1{fill:none;}</style><style class="darkreader darkreader--sync" media="screen"></style></defs><title>opacity</title><rect x="6" y="6" width="4" height="4"></rect><rect x="10" y="10" width="4" height="4"></rect><rect x="14" y="6" width="4" height="4"></rect><rect x="22" y="6" width="4" height="4"></rect><rect x="6" y="14" width="4" height="4"></rect><rect x="14" y="14" width="4" height="4"></rect><rect x="22" y="14" width="4" height="4"></rect><rect x="6" y="22" width="4" height="4"></rect><rect x="14" y="22" width="4" height="4"></rect><rect x="22" y="22" width="4" height="4"></rect><rect x="18" y="10" width="4" height="4"></rect><rect x="10" y="18" width="4" height="4"></rect><rect x="18" y="18" width="4" height="4"></rect><rect id="_Transparent_Rectangle_" data-name="&lt;Transparent Rectangle&gt;" class="cls-1" width="32" height="32"></rect></g></svg>
-      `
+		`<svg fill="#000000" viewBox="0 0 32.00 32.00" id="icon" xmlns="http://www.w3.org/2000/svg" transform="rotate(0)"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><defs><style>.cls-1{fill:none;}</style></defs><title>opacity</title><rect x="6" y="6" width="4" height="4"></rect><rect x="10" y="10" width="4" height="4"></rect><rect x="14" y="6" width="4" height="4"></rect><rect x="22" y="6" width="4" height="4"></rect><rect x="6" y="14" width="4" height="4"></rect><rect x="14" y="14" width="4" height="4"></rect><rect x="22" y="14" width="4" height="4"></rect><rect x="6" y="22" width="4" height="4"></rect><rect x="14" y="22" width="4" height="4"></rect><rect x="22" y="22" width="4" height="4"></rect><rect x="18" y="10" width="4" height="4"></rect><rect x="10" y="18" width="4" height="4"></rect><rect x="18" y="18" width="4" height="4"></rect><rect id="_Transparent_Rectangle_" data-name="&lt;Transparent Rectangle&gt;" class="cls-1" width="32" height="32"></rect></g></svg>`
 	);
 
+	// Monitor opacity slider
 	const changeMonitorOpacity = (e) => {
 		oState.monitorOpacity = e.target.value;
 		monitorCanvas.style.opacity = oState.monitorOpacity / 100;
