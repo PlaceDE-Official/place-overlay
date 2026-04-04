@@ -92,7 +92,10 @@ Falls das nicht klappt, muss die Seite leider manuell neu geladen werden, um ein
 Danach sollte es sich wieder selbst aktualisieren (eventuell sorgen aber auch andere Erweiterungen dafür, dass nur durch Neuladen der Seite neue Pixelarts angezeigt werden können).
 
 ### Wie kann ich das Overlay auf dem Handy nutzen?
-Ne, leider ist das nicht möglich und wird auch in Zukunft nicht möglich sein.
+Jein.
+Die meisten Browser auf Mobilgeräten unterstützen keine Erweiterungen wie Tampermonkey und können daher das Overlay nicht in die Website einbinden.
+Zum Beispiel aber bei Firefox unter Android kann man Tampermonkey kostenlos installieren und das Overlay benutzen, beim Chrome Browser und vielen Chromium Varianten kann man keine erweiterungen installieren.
+Für den Safari Browser auf iOS ist Tampermonkey laut Website kostenpflichtig.
 
 ### Wieso ist der Pixel im Overlay falsch?
 Das liegt daran, dass die Vorlage einen Fehler enthält.
