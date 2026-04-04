@@ -66,7 +66,14 @@ Außerdem gibt es unter dem Button einen Schieberegler (3).
 Dieser regelt, wie "durchscheinend" das Overlay sein soll.
 Auf der ganz unteren Position ist das Overlay komplett durchsichtig.
 
-![Vorschau des erweiterten Overlays](img/advanced_overlay.png)
+Der unterste Button (4) aktiviert ein zusätzliches Overlay, welches für jedes Artwork mit einem Rahmen, Namen und Statistiken (5) den Fortschritt anzeigt.
+Diese Statistiken zeigen die voraussichtliche Dauer bis zu Fertigstellung und den Prozentsatz der richtigen Pixel im Artwork.
+Wenn das Monitor-Overlay aktiv ist, wird ein Schieberegler angezeigt, mit dem man die Transparenz des Monitor-Overlays einstellen kann.
+In der oberen rechten Ecke (6) sind alle Artworks aufgelistet und nach dem Prozentsatz der schon richtigen Pixel aufsteigend sortiert.
+
+<p align="center">
+  <img src="img/advanced_overlay.png" height="500" alt="Vorschau des erweiterten Overlays"/>
+</p>
 
 ------------
 
