@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         [placeDE] r/tyles 2026 Extended
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  Script that adds a button to toggle an hardcoded image shown in the 2026's r/tyles canvas
+// @version      1.3
+// @description  Script that adds a button to toggle an hardcoded image shown in the 2026's r/tyles canvas + auto color picker
 // @author       max-was-here and placeDE Devs
 // @match        https://tyles.place/*
 // @match        https://tyles.place
@@ -223,10 +223,98 @@ const AO_STYLE = `
     margin-left: 8px;
     white-space: nowrap;
   }
+
+  /* Auto color picker hint (bottom-left) */
+  .ao-color-hint {
+    position: absolute;
+    bottom: 25px;
+    left: 25px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 6px 10px;
+    font-family: var(--garlic-bread-font-pixel);
+    font-size: 0.75rem;
+    pointer-events: none;
+    z-index: 100002;
+  }
+  .ao-color-hint.ao-hidden {
+    display: none !important;
+  }
+  .ao-color-swatch {
+    width: 16px;
+    height: 16px;
+    border: 1px solid rgba(255,255,255,0.4);
+    flex-shrink: 0;
+  }
+  .ao-color-label {
+    white-space: nowrap;
+    color: #fff;
+  }
 `;
 
 let toggleSmallPixelButton;
 let toggleFullPixelButton;
+
+// ==============================================
+// Auto color: dedicated 1:1 sampling image
+// overlay.png has 1 pixel per canvas tile — coords map directly, zero conversion.
+// Never rendered on screen; only used for getImageData reads.
+// ==============================================
+const SAMPLE_URL = 'https://raw.githubusercontent.com/PlaceDE-Official/pixel/main/outputs/overlay.png';
+
+const sampleImg = document.createElement('img');
+sampleImg.crossOrigin = 'anonymous';
+
+const offscreenCanvas = document.createElement('canvas');
+const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+
+let sampleReady = false;
+
+const loadSampleImage = () => {
+	sampleReady = false;
+	sampleImg.src = SAMPLE_URL + '?' + Date.now();
+	console.log('[PLACEDE] loading 1:1 sample image…');
+};
+
+sampleImg.onload = () => {
+	offscreenCanvas.width  = sampleImg.naturalWidth;
+	offscreenCanvas.height = sampleImg.naturalHeight;
+	offscreenCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+	try {
+		offscreenCtx.drawImage(sampleImg, 0, 0);
+		sampleReady = true;
+		const cx = Math.floor(sampleImg.naturalWidth  / 2);
+		const cy = Math.floor(sampleImg.naturalHeight / 2);
+		const [r, g, b, a] = offscreenCtx.getImageData(cx, cy, 1, 1).data;
+		console.log(`[PLACEDE] sample image ready — ${offscreenCanvas.width}x${offscreenCanvas.height} | center pixel rgba(${r},${g},${b},${a})`);
+	} catch (e) {
+		sampleReady = false;
+		console.error('[PLACEDE] drawImage failed (CORS?). Pixel sampling disabled.', e);
+	}
+};
+
+sampleImg.onerror = (e) => {
+	sampleReady = false;
+	console.error('[PLACEDE] sample image failed to load:', e);
+};
+
+loadSampleImage();
+setInterval(loadSampleImage, 30000);
+
+// Converts r,g,b integers to '#RRGGBB'
+function rgbToHex(r, g, b) {
+	return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0').toUpperCase()).join('');
+}
+
+// Normalises whatever style.backgroundColor the browser gives (hex or rgb(...)) to '#RRGGBB'
+function normaliseBtnColor(css) {
+	if (/^#[0-9a-fA-F]{6}$/.test(css)) return css.toUpperCase();
+	const m = css.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+	if (m) return rgbToHex(+m[1], +m[2], +m[3]);
+	return null;
+}
 
 addEventListener('load', () => {
 	console.log('[PLACEDE] Extended overlay loading...');
@@ -245,7 +333,8 @@ addEventListener('load', () => {
 		monitorOpacity: 100,
 		overlayIdx: 0,
 		monitorEnabled: false,
-		monitorUrl: 'wss://placede-monitor.devminer.xyz'
+		monitorUrl: 'wss://placede-monitor.devminer.xyz',
+		autoColor: false,
 	};
 
 	const oStateStorage = localStorage.getItem(STORAGE_KEY);
@@ -343,13 +432,13 @@ addEventListener('load', () => {
 
 	const getFormattedCompletionText = (artwork, outputEta=false) => {
 		let text = artwork.completion.toFixed(1) + '%';
-		// prepend ">" or "<", if rounded to 0.0% or 100.0%
+		// prepend ">" or "<", if rounded to 0.0% or 100.0%		
 		if (text === '0.0%' && artwork.completion > 0) {
 			text = '> 0.0%';
 		} else if (text === '100.0%' && artwork.completion < 100) {
 			text = '< 100.0%';
 		}
-		// append ETA, if present and requested
+				// append ETA, if present and requested
 		if (outputEta && artwork.eta_seconds != null && artwork.eta_seconds > 0) {
 			const mins = Math.floor(artwork.eta_seconds / 60);
 			const secs = Math.floor(artwork.eta_seconds % 60);
@@ -462,7 +551,7 @@ addEventListener('load', () => {
 			ctx.globalAlpha = alpha;
 
 			const pct = art.completion;
-			// Color: red (0°) → orange (30°) → green (120°) via HSL
+			// Color: red (0°) → orange (30°) → green (120°) via HSL			
 			const hue = (pct / 100) * 120;
 			const color = `hsl(${hue}, 100%, 45%)`;
 
@@ -522,7 +611,7 @@ addEventListener('load', () => {
 		if (!oState.monitorEnabled || monitorArtworks.size === 0) return;
 
 		// figure out which canvas pixel the user is hovering over, so we can select
-		// the artwork
+		// the artwork		
 
 		const rect = canvas.getBoundingClientRect();
 		const px = ((e.clientX - rect.left) / rect.width) * canvas.width;
@@ -670,6 +759,88 @@ addEventListener('load', () => {
 		monitorConnect();
 	}
 
+	// Auto color picker UI
+	const colorHint = document.createElement('div');
+	colorHint.classList.add('ao-color-hint');
+	if (!oState.autoColor) colorHint.classList.add('ao-hidden');
+
+	const colorSwatch = document.createElement('div');
+	colorSwatch.classList.add('ao-color-swatch');
+
+	const colorLabel = document.createElement('span');
+	colorLabel.classList.add('ao-color-label');
+	colorLabel.textContent = '—';
+
+	colorHint.appendChild(colorSwatch);
+	colorHint.appendChild(colorLabel);
+	mainContainer.appendChild(colorHint);
+
+	// Auto color picker logic
+	const readCoords = () => {
+		const pill = document.querySelector('.choco-1aw21lp');
+		if (!pill) return null;
+		const m = pill.textContent.match(/\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/);
+		if (!m) return null;
+		return { x: parseInt(m[1], 10), y: parseInt(m[2], 10) };
+	};
+
+	let lastCoordKey = '';
+	let lastColorKey = '';
+
+	const autoPickColor = () => {
+		if (!oState.autoColor) return;
+		if (!sampleReady) return;
+
+		const coords = readCoords();
+		if (!coords) return;
+
+		// Only act on cursor movement
+		const coordKey = `${coords.x},${coords.y}`;
+		if (coordKey === lastCoordKey) return;
+		lastCoordKey = coordKey;
+
+		const { x, y } = coords;
+
+		if (x < 0 || y < 0 || x >= offscreenCanvas.width || y >= offscreenCanvas.height) {
+			colorSwatch.style.backgroundColor = 'transparent';
+			colorLabel.textContent = 'out of bounds';
+			console.log(`[PLACEDE] (${x}, ${y}) → out of bounds`);
+			return;
+		}
+
+		const [r, g, b, a] = offscreenCtx.getImageData(x, y, 1, 1).data;
+
+		if (a < 10) {
+			colorSwatch.style.backgroundColor = 'transparent';
+			colorLabel.textContent = 'transparent';
+			console.log(`[PLACEDE] (${x}, ${y}) → color: none`);
+			return;
+		}
+
+		const hex = rgbToHex(r, g, b);
+		console.log(`[PLACEDE] (${x}, ${y}) → ${hex}`);
+
+		if (hex === lastColorKey) return;
+		lastColorKey = hex;
+
+		// Find the palette button whose background matches this hex
+		const btn = [...document.querySelectorAll('.choco-8nok5g button[id^="color-"]')]
+			.find(b => normaliseBtnColor(b.style.backgroundColor) === hex);
+
+		colorSwatch.style.backgroundColor = hex;
+
+		if (!btn) {
+			colorLabel.textContent = hex + ' (no match)';
+			console.log(`[PLACEDE] no palette button found for ${hex}`);
+			return;
+		}
+
+		colorLabel.textContent = `${btn.id} ${hex}`;
+		btn.click();
+	};
+
+	setInterval(autoPickColor, 100);
+
 	const styleContainer = document.createElement('style');
 	styleContainer.innerHTML = AO_STYLE;
 	mainContainer.appendChild(styleContainer);
@@ -780,6 +951,31 @@ addEventListener('load', () => {
 		'Screenshot',
 		exportScreenshot
 	);
+
+	let autoColorButton;
+	const updateAutoColorButtonState = () => {
+		autoColorButton.classList.toggle('ao-active', oState.autoColor);
+		colorHint.classList.toggle('ao-hidden', !oState.autoColor);
+	};
+
+	autoColorButton = addButton(
+		`<svg width="32px" height="32px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3.5 20.5L3 21H2.5V20.5L3 20L3.5 20.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12.8284 5.17157L18.8284 11.1716M12.8284 5.17157L14.2426 3.75736C15.0237 2.97631 16.2900 2.97631 17.0711 3.75736L20.2426 6.92893C21.0237 7.70998 21.0237 8.97631 20.2426 9.75736L18.8284 11.1716M12.8284 5.17157L4.87868 13.1213C4.31607 13.6839 4 14.4467 4 15.2426V17C4 17.5523 4.44772 18 5 18H6.75736C7.55321 18 8.31607 17.6839 8.87868 17.1213L16.8284 9.17157M18.8284 11.1716L16.8284 9.17157M3.5 20.5L8 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`,
+		'Toggle Auto Color Picker',
+		() => {
+			oState.autoColor = !oState.autoColor;
+			updateAutoColorButtonState();
+			saveState();
+			if (oState.autoColor) {
+				lastCoordKey = '';
+				lastColorKey = '';
+				autoPickColor();
+			}
+		}
+	);
+	updateAutoColorButtonState();
 
 	toggleSmallPixelButton = addButton(
 		`
