@@ -54,6 +54,8 @@ Nach dem Installieren siehst du auf der r/place Leinwand kleinere "Pixel" innerh
 
 ### Erweiterte Variante:
 
+![Vorschau des erweiterten Overlays](img/advanced_overlay.png)
+
 Der Kamera Button (1) erstellt ein Screenshot vom gesamten Canvas.
 
 Mit dem Knopf unten rechts (2) kann man zwischen mehreren Modi wechseln:
