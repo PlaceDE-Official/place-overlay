@@ -341,6 +341,23 @@ addEventListener('load', () => {
 	monitorList.classList.add('ao-monitor-list');
 	monitorPanel.appendChild(monitorList);
 
+	const getFormattedCompletionText = (artwork, outputEta=false) => {
+		let text = artwork.completion.toFixed(1) + '%';
+		// prepend ">" or "<", if rounded to 0.0% or 100.0%
+		if (text === '0.0%' && artwork.completion > 0) {
+			text = '> 0.0%';
+		} else if (text === '100.0%' && artwork.completion < 100) {
+			text = '< 100.0%';
+		}
+		// append ETA, if present and requested
+		if (outputEta && artwork.eta_seconds != null && artwork.eta_seconds > 0) {
+			const mins = Math.floor(artwork.eta_seconds / 60);
+			const secs = Math.floor(artwork.eta_seconds % 60);
+			text += mins > 0 ? ` (${mins}m${secs}s)` : ` (${secs}s)`;
+		}
+		return text;
+	}
+
 	const updateMonitorPanel = () => {
 		const sorted = [...monitorArtworks.values()].sort((a, b) => a.completion - b.completion);
 		monitorList.innerHTML = '';
@@ -360,12 +377,7 @@ addEventListener('load', () => {
 			name.textContent = art.name;
 			name.title = art.name;
 
-			let pctText = art.completion.toFixed(1) + '%';
-			if (art.eta_seconds != null && art.eta_seconds > 0) {
-				const mins = Math.floor(art.eta_seconds / 60);
-				const secs = Math.floor(art.eta_seconds % 60);
-				pctText += mins > 0 ? ` (${mins}m${secs}s)` : ` (${secs}s)`;
-			}
+			const pctText = getFormattedCompletionText(art, outputEta=true);
 
 			const pct = document.createElement('span');
 			pct.classList.add('ao-monitor-pct');
@@ -460,7 +472,7 @@ addEventListener('load', () => {
 
 			ctx.font = '3px monospace';
 
-			const pctLabel = pct.toFixed(1) + '%';
+			let pctLabel = getFormattedCompletionText(art);
 			const pctMetrics = ctx.measureText(pctLabel);
 			const pctH = 4;
 			const pctW = pctMetrics.width + 2;
